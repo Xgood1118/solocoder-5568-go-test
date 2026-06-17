@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.title}}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; color: #333; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }
+        .header h1 { font-size: 32px; margin-bottom: 10px; }
+        .header p { opacity: 0.9; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 30px; }
+        .back-btn { display: inline-block; padding: 12px 24px; background: white; color: #667eea; text-decoration: none; border-radius: 8px; margin-bottom: 20px; font-weight: 500; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: all 0.2s; }
+        .back-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .section { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 24px; }
+        .section h2 { font-size: 20px; margin-bottom: 20px; color: #333; display: flex; align-items: center; gap: 10px; }
+        .section h2::before { content: ''; width: 4px; height: 20px; background: #667eea; border-radius: 2px; }
+        .filters { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+        .filters input { padding: 10px 16px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px; outline: none; transition: border-color 0.2s; }
+        .filters input:focus { border-color: #667eea; }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s; background: #667eea; color: white; }
+        .btn:hover { background: #5a67d8; }
+        .chart-container { position: relative; height: 400px; margin-bottom: 30px; }
+        .chart { width: 100%; height: 100%; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px; padding: 24px; text-align: center; }
+        .stat-card.success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .stat-card.danger { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+        .stat-card.warning { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .stat-card .value { font-size: 36px; font-weight: bold; margin-bottom: 8px; }
+        .stat-card .label { opacity: 0.9; font-size: 14px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 14px 16px; text-align: left; border-bottom: 1px solid #f3f4f6; }
+        th { background: #f9fafb; font-weight: 600; color: #374151; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+        tr:hover { background: #f9fafb; }
+        .status-passed { color: #10b981; font-weight: 600; }
+        .status-failed { color: #ef4444; font-weight: 600; }
+        .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+        .badge-passed { background: #d1fae5; color: #065f46; }
+        .badge-failed { background: #fee2e2; color: #991b1b; }
+        .empty { text-align: center; padding: 60px 20px; color: #9ca3af; }
+        .empty .icon { font-size: 64px; margin-bottom: 16px; opacity: 0.5; }
+        .chart-legend { display: flex; justify-content: center; gap: 30px; margin-top: 20px; }
+        .legend-item { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #6b7280; }
+        .legend-color { width: 16px; height: 16px; border-radius: 4px; }
+        .legend-color.pass-rate { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .legend-color.duration { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📈 趋势分析</h1>
+        <p>查看测试执行历史趋势和性能变化</p>
+    </div>
+    <div class="container">
+        <a href="/" class="back-btn">← 返回首页</a>
+
+        <div class="filters">
+            <input type="text" id="suiteInput" placeholder="套件名称过滤..." value="{{.suite}}" style="flex: 1; min-width: 200px;">
+            <button class="btn" onclick="filterTrend()">🔍 筛选</button>
+        </div>
+
+        {{if .records}}
+        <div class="stats">
+            <div class="stat-card success">
+                <div class="value">{{printf "%.1f%%" (index .stats "avg_pass_rate")}}</div>
+                <div class="label">平均通过率</div>
+            </div>
+            <div class="stat-card">
+                <div class="value">{{index .stats "total_runs"}}</div>
+                <div class="label">执行次数</div>
+            </div>
+            <div class="stat-card warning">
+                <div class="value">{{index .stats "avg_duration"}}ms</div>
+                <div class="label">平均耗时</div>
+            </div>
+            <div class="stat-card danger">
+                <div class="value">{{index .stats "total_cases"}}</div>
+                <div class="label">用例总数</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📊 通过率趋势</h2>
+            <div class="chart-container">
+                <canvas id="passRateChart" class="chart"></canvas>
+            </div>
+            <div class="chart-legend">
+                <div class="legend-item">
+                    <div class="legend-color pass-rate"></div>
+                    <span>通过率 (%)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>⏱️ 执行耗时趋势</h2>
+            <div class="chart-container">
+                <canvas id="durationChart" class="chart"></canvas>
+            </div>
+            <div class="chart-legend">
+                <div class="legend-item">
+                    <div class="legend-color duration"></div>
+                    <span>执行耗时 (ms)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📋 详细记录</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>时间</th>
+                        <th>测试套件</th>
+                        <th>总数</th>
+                        <th>通过</th>
+                        <th>失败</th>
+                        <th>跳过</th>
+                        <th>通过率</th>
+                        <th>耗时</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range $index, $record := .records}}
+                    <tr>
+                        <td>{{len .records | minus $index}}</td>
+                        <td>{{formatDate $record.Timestamp}}</td>
+                        <td><strong>{{$record.SuiteName}}</strong></td>
+                        <td>{{$record.Total}}</td>
+                        <td class="status-passed">{{$record.Passed}}</td>
+                        <td class="status-failed">{{$record.Failed}}</td>
+                        <td>{{$record.Skipped}}</td>
+                        <td>
+                            <span class="badge {{if eq $record.Failed 0}}badge-passed{{else}}badge-failed{{end}}">
+                                {{printf "%.1f%%" $record.PassRate}}
+                            </span>
+                        </td>
+                        <td>{{formatDuration $record.DurationMs}}</td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        {{else}}
+        <div class="empty">
+            <div class="icon">📭</div>
+            <h3>暂无数据</h3>
+            <p>运行测试后，趋势数据将显示在这里</p>
+        </div>
+        {{end}}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        function filterTrend() {
+            const suite = document.getElementById('suiteInput').value;
+            window.location.href = '/trend?suite=' + encodeURIComponent(suite);
+        }
+
+        {{if .records}}
+        const labels = {{trendLabels .records}};
+        const passRates = {{trendData .records}};
+        const durations = {{trendDurations .records}};
+
+        new Chart(document.getElementById('passRateChart'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '通过率 (%)',
+                    data: passRates,
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#10b981',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(0,0,0,0.8)',
+                        padding: 12,
+                        titleFont: { size: 14 },
+                        bodyFont: { size: 13 },
+                        callbacks: {
+                            label: function(context) {
+                                return '通过率: ' + context.parsed.y.toFixed(1) + '%';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        grid: { color: 'rgba(0,0,0,0.05)' },
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    },
+                    x: {
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+
+        new Chart(document.getElementById('durationChart'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '执行耗时 (ms)',
+                    data: durations,
+                    backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                    borderColor: '#667eea',
+                    borderWidth: 2,
+                    borderRadius: 6,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(0,0,0,0.8)',
+                        padding: 12,
+                        callbacks: {
+                            label: function(context) {
+                                return '耗时: ' + context.parsed.y + 'ms';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(0,0,0,0.05)' }
+                    },
+                    x: {
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+        {{end}}
+    </script>
+</body>
+</html>

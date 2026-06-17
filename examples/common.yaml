@@ -1,0 +1,29 @@
+name: Common Config
+version: "1.0"
+variables:
+  base_url: "https://jsonplaceholder.typicode.com"
+  api_version: "v1"
+  timeout: 30
+  retry_count: 2
+
+auth:
+  type: bearer
+  config:
+    token: "test-token-12345"
+
+mock_rules:
+  - id: "mock-users"
+    match_path: "/api/users"
+    match_method: "GET"
+    status: 200
+    delay_ms: 100
+    headers:
+      Content-Type: "application/json"
+    body:
+      - id: 1
+        name: "Mock User"
+        email: "mock@example.com"
+
+tags:
+  - "common"
+  - "base-config"

@@ -1,0 +1,306 @@
+name: Demo API Test Suite
+description: 演示 API 测试运行器的各种功能
+version: "1.0"
+includes:
+  - common.yaml
+
+variables:
+  env: "production"
+  user_id: 1
+
+base_url: "{{base_url}}"
+timeout: 30
+retries: 2
+concurrency: 2
+
+tags:
+  - "demo"
+  - "regression"
+
+setup:
+  - id: "setup-check-health"
+    name: "健康检查"
+    request:
+      method: GET
+      url: "{{base_url}}/users/1"
+    assertions:
+      - type: status
+        expected: 200
+
+teardown:
+  - id: "teardown-cleanup"
+    name: "清理资源"
+    skip: true
+    request:
+      method: DELETE
+      url: "{{base_url}}/posts/{{new_post_id}}"
+    assertions:
+      - type: status
+        expected: 200
+
+test_cases:
+  - id: "TC-001"
+    name: "获取用户列表 - GET"
+    description: "测试获取所有用户列表"
+    tags: ["users", "get"]
+    request:
+      method: GET
+      url: "{{base_url}}/users"
+      headers:
+        Accept: "application/json"
+    assertions:
+      - type: status
+        expected: 200
+      - type: header
+        property: "Content-Type"
+        expected: "application/json; charset=utf-8"
+        operator: contains
+      - type: body
+        property: "$.length()"
+        expected: 10
+        operator: ">="
+      - type: body
+        property: "$[0].name"
+        expected: "Leanne Graham"
+      - type: response_time
+        expected: 5000
+        operator: "<"
+    extract:
+      first_user_id: "$[0].id"
+      first_user_name: "$[0].name"
+
+  - id: "TC-002"
+    name: "创建新用户 - POST JSON"
+    description: "测试创建新用户，使用 JSON body"
+    tags: ["users", "post"]
+    depends_on: ["TC-001"]
+    variables:
+      new_user_name: "Test User {{timestamp}}"
+    request:
+      method: POST
+      url: "{{base_url}}/users"
+      headers:
+        Content-Type: "application/json"
+      body:
+        type: json
+        json:
+          name: "{{new_user_name}}"
+          username: "testuser"
+          email: "test@example.com"
+          phone: "123-456-7890"
+    assertions:
+      - type: status
+        expected: 201
+      - type: body
+        property: "$.name"
+        expected: "{{new_user_name}}"
+      - type: body
+        property: "$.id"
+        expected: 11
+    extract:
+      new_post_id: "$.id"
+
+  - id: "TC-003"
+    name: "更新用户 - PUT"
+    description: "测试更新用户信息"
+    tags: ["users", "put"]
+    depends_on: ["TC-002"]
+    request:
+      method: PUT
+      url: "{{base_url}}/users/{{new_post_id}}"
+      body:
+        type: json
+        json:
+          name: "Updated Name"
+          email: "updated@example.com"
+    assertions:
+      - type: status
+        expected: 200
+      - type: body
+        property: "$.name"
+        expected: "Updated Name"
+
+  - id: "TC-004"
+    name: "部分更新 - PATCH"
+    description: "测试部分更新用户"
+    tags: ["users", "patch"]
+    request:
+      method: PATCH
+      url: "{{base_url}}/users/1"
+      body:
+        type: json
+        json:
+          email: "newemail@example.com"
+    assertions:
+      - type: status
+        expected: 200
+      - type: body
+        property: "$.email"
+        expected: "newemail@example.com"
+
+  - id: "TC-005"
+    name: "删除用户 - DELETE"
+    description: "测试删除用户"
+    tags: ["users", "delete"]
+    request:
+      method: DELETE
+      url: "{{base_url}}/users/1"
+    assertions:
+      - type: status
+        expected: 200
+
+  - id: "TC-006"
+    name: "自定义 WebDAV 方法"
+    description: "测试自定义 HTTP 方法 PROPFIND"
+    tags: ["webdav", "custom"]
+    skip: true
+    request:
+      method: PROPFIND
+      url: "{{base_url}}/webdav/file.txt"
+      headers:
+        Depth: "1"
+    assertions:
+      - type: status
+        expected: 207
+
+  - id: "TC-007"
+    name: "Form 表单提交"
+    description: "测试 application/x-www-form-urlencoded"
+    tags: ["form", "post"]
+    request:
+      method: POST
+      url: "{{base_url}}/posts"
+      body:
+        type: form
+        form:
+          title: "Test Post"
+          body: "This is a test post"
+          userId: "1"
+    assertions:
+      - type: status
+        expected: 201
+      - type: body
+        property: "$.title"
+        expected: "Test Post"
+
+  - id: "TC-008"
+    name: "GraphQL 查询"
+    description: "测试 GraphQL 请求"
+    tags: ["graphql"]
+    skip: true
+    request:
+      method: POST
+      url: "https://api.example.com/graphql"
+      body:
+        type: graphql
+        graphql:
+          query: |
+            query GetUser($id: ID!) {
+              user(id: $id) {
+                id
+                name
+                email
+              }
+            }
+          variables:
+            id: "123"
+          operationName: "GetUser"
+    assertions:
+      - type: status
+        expected: 200
+      - type: body
+        property: "$.data.user.id"
+        expected: "123"
+
+  - id: "TC-009"
+    name: "JSON Schema 验证"
+    description: "测试响应体 JSON Schema 验证"
+    tags: ["schema", "validation"]
+    request:
+      method: GET
+      url: "{{base_url}}/users/1"
+    assertions:
+      - type: schema
+        expected:
+          type: object
+          required: ["id", "name", "email"]
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            email:
+              type: string
+              format: email
+
+  - id: "TC-010"
+    name: "正则表达式匹配"
+    description: "测试正则表达式断言"
+    tags: ["regex"]
+    request:
+      method: GET
+      url: "{{base_url}}/users/1"
+    assertions:
+      - type: body
+        property: "$.email"
+        expected: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+        operator: regex
+
+  - id: "TC-011"
+    name: "数据驱动测试 - CSV"
+    description: "从 CSV 文件读取测试数据"
+    tags: ["datadriven", "csv"]
+    data_driven:
+      source: "users.csv"
+      format: csv
+      csv:
+        has_header: true
+        delimiter: ","
+    request:
+      method: GET
+      url: "{{base_url}}/users/{{id}}"
+    assertions:
+      - type: status
+        expected: 200
+      - type: body
+        property: "$.id"
+        expected: "{{id}}"
+      - type: body
+        property: "$.name"
+        expected: "{{name}}"
+
+  - id: "TC-012"
+    name: "数据驱动测试 - 内联数据"
+    description: "使用内联数组数据驱动"
+    tags: ["datadriven", "inline"]
+    data_driven:
+      source: inline
+      format: json
+      data:
+        - id: 1
+          expected_name: "Leanne Graham"
+        - id: 2
+          expected_name: "Ervin Howell"
+        - id: 3
+          expected_name: "Clementine Bauch"
+    request:
+      method: GET
+      url: "{{base_url}}/users/{{id}}"
+    assertions:
+      - type: status
+        expected: 200
+      - type: body
+        property: "$.name"
+        expected: "{{expected_name}}"
+
+  - id: "TC-013"
+    name: "Dry Run 测试"
+    description: "此用例在 dry-run 模式下只校验不执行"
+    tags: ["dryrun"]
+    skip: true
+    request:
+      method: GET
+      url: "{{base_url}}/posts"
+    assertions:
+      - type: status
+        expected: 200

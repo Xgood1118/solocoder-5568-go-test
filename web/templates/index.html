@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.title}}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; color: #333; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }
+        .header h1 { font-size: 32px; margin-bottom: 10px; }
+        .header p { opacity: 0.9; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 30px; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); text-align: center; }
+        .stat-card .value { font-size: 36px; font-weight: bold; color: #667eea; margin-bottom: 8px; }
+        .stat-card .label { color: #666; font-size: 14px; }
+        .stat-card.success .value { color: #10b981; }
+        .stat-card.warning .value { color: #f59e0b; }
+        .stat-card.danger .value { color: #ef4444; }
+        .section { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 24px; }
+        .section h2 { font-size: 20px; margin-bottom: 20px; color: #333; display: flex; align-items: center; gap: 10px; }
+        .section h2::before { content: ''; width: 4px; height: 20px; background: #667eea; border-radius: 2px; }
+        .filters { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+        .filters input, .filters select { padding: 10px 16px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px; outline: none; transition: border-color 0.2s; }
+        .filters input:focus, .filters select:focus { border-color: #667eea; }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s; }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5a67d8; }
+        .btn-outline { background: transparent; border: 2px solid #e5e7eb; color: #374151; }
+        .btn-outline:hover { border-color: #667eea; color: #667eea; }
+        .btn-outline.active { background: #667eea; color: white; border-color: #667eea; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 14px 16px; text-align: left; border-bottom: 1px solid #f3f4f6; }
+        th { background: #f9fafb; font-weight: 600; color: #374151; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+        tr:hover { background: #f9fafb; }
+        .status-passed { color: #10b981; font-weight: 600; }
+        .status-failed { color: #ef4444; font-weight: 600; }
+        .status-skipped { color: #f59e0b; font-weight: 600; }
+        .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+        .badge-passed { background: #d1fae5; color: #065f46; }
+        .badge-failed { background: #fee2e2; color: #991b1b; }
+        .badge-skipped { background: #fef3c7; color: #92400e; }
+        .nav-tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; }
+        .nav-tab { padding: 12px 24px; cursor: pointer; border: none; background: none; font-size: 14px; font-weight: 500; color: #6b7280; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
+        .nav-tab.active { color: #667eea; border-bottom-color: #667eea; }
+        .nav-tab:hover { color: #667eea; }
+        .empty { text-align: center; padding: 60px 20px; color: #9ca3af; }
+        .empty .icon { font-size: 64px; margin-bottom: 16px; opacity: 0.5; }
+        .trend-mini { height: 40px; display: flex; align-items: flex-end; gap: 2px; }
+        .trend-mini .bar { width: 6px; background: linear-gradient(to top, #667eea, #a78bfa); border-radius: 2px 2px 0 0; transition: all 0.2s; }
+        .trend-mini .bar:hover { background: #667eea; }
+        a { color: #667eea; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧪 API Tester</h1>
+        <p>接口自动化测试报告平台</p>
+    </div>
+    <div class="container">
+        <div class="stats">
+            <div class="stat-card">
+                <div class="value">{{.stats.total_runs}}</div>
+                <div class="label">执行次数</div>
+            </div>
+            <div class="stat-card {{if and .stats.latest (gt .stats.latest.Failed 0)}}danger{{else}}success{{end}}">
+                <div class="value">{{printf "%.1f%%" .stats.avg_pass_rate}}</div>
+                <div class="label">平均通过率</div>
+            </div>
+            <div class="stat-card">
+                <div class="value">{{.stats.total_cases}}</div>
+                <div class="label">执行用例总数</div>
+            </div>
+            <div class="stat-card">
+                <div class="value">{{.stats.avg_duration}}ms</div>
+                <div class="label">平均耗时</div>
+            </div>
+        </div>
+
+        {{if .stats.latest}}
+        <div class="section">
+            <h2>📌 最近执行</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px; background: #f9fafb; border-radius: 8px;">
+                <div>
+                    <strong style="font-size: 16px;">{{.stats.latest.SuiteName}}</strong>
+                    <p style="color: #6b7280; margin-top: 4px;">{{formatDate .stats.latest.Timestamp}}</p>
+                </div>
+                <div style="text-align: right;">
+                    <span class="badge {{if eq .stats.latest.Failed 0}}badge-passed{{else}}badge-failed{{end}}">
+                        {{.stats.latest.Passed}}/{{.stats.latest.Total}} 通过
+                    </span>
+                    <p style="color: #6b7280; margin-top: 4px;">{{.stats.latest.DurationMs}}ms</p>
+                </div>
+            </div>
+        </div>
+        {{end}}
+
+        <div class="section">
+            <h2>📊 执行历史</h2>
+            <div class="filters">
+                <input type="text" id="searchInput" placeholder="搜索套件名称..." style="flex: 1; min-width: 200px;">
+                <select id="statusFilter">
+                    <option value="all">全部状态</option>
+                    <option value="passed">仅通过</option>
+                    <option value="failed">仅失败</option>
+                </select>
+                <a href="/trend" class="btn btn-primary">📈 查看趋势</a>
+            </div>
+
+            {{if .records}}
+            <div class="nav-tabs">
+                <button class="nav-tab active" data-page="1">第 1 页</button>
+            </div>
+            <table id="historyTable">
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>测试套件</th>
+                        <th>环境</th>
+                        <th>总数</th>
+                        <th>通过</th>
+                        <th>失败</th>
+                        <th>跳过</th>
+                        <th>通过率</th>
+                        <th>耗时</th>
+                        <th>趋势</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range $index, $record := .records}}
+                    <tr class="status-{{if gt $record.Failed 0}}failed{{else}}passed{{end}}">
+                        <td>{{formatDate $record.Timestamp}}</td>
+                        <td><strong>{{$record.SuiteName}}</strong></td>
+                        <td>{{if $record.Environment}}{{$record.Environment}}{{else}}-{{end}}</td>
+                        <td>{{$record.Total}}</td>
+                        <td class="status-passed">{{$record.Passed}}</td>
+                        <td class="status-failed">{{$record.Failed}}</td>
+                        <td class="status-skipped">{{$record.Skipped}}</td>
+                        <td>
+                            <span class="badge {{if eq $record.Failed 0}}badge-passed{{else}}badge-failed{{end}}">
+                                {{printf "%.1f%%" $record.PassRate}}
+                            </span>
+                        </td>
+                        <td>{{formatDuration $record.DurationMs}}</td>
+                        <td>
+                            <div class="trend-mini" data-suite="{{$record.SuiteName}}">
+                                {{$suitename := $record.SuiteName}}
+                                {{range $i := seq 1 10}}
+                                <div class="bar" style="height: {{mult 10 10}}px;"></div>
+                                {{end}}
+                            </div>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+            {{else}}
+            <div class="empty">
+                <div class="icon">📭</div>
+                <h3>暂无执行记录</h3>
+                <p>运行测试后，执行记录将显示在这里</p>
+            </div>
+            {{end}}
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            const search = e.target.value.toLowerCase();
+            document.querySelectorAll('#historyTable tbody tr').forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(search) ? '' : 'none';
+            });
+        });
+
+        document.getElementById('statusFilter').addEventListener('change', function(e) {
+            const status = e.target.value;
+            document.querySelectorAll('#historyTable tbody tr').forEach(row => {
+                if (status === 'all') {
+                    row.style.display = '';
+                } else if (status === 'passed' && row.classList.contains('status-passed')) {
+                    row.style.display = '';
+                } else if (status === 'failed' && row.classList.contains('status-failed')) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

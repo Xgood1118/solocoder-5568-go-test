@@ -1,0 +1,99 @@
+name: WebSocket/SSE Test Demo
+description: 演示 WebSocket 和 SSE 测试功能
+version: "1.0"
+
+variables:
+  ws_url: "wss://echo.websocket.org"
+  sse_url: "https://example.com/sse"
+
+test_cases:
+  - id: "WS-001"
+    name: "WebSocket 连接测试"
+    description: "测试 WebSocket 连接和消息收发"
+    tags: ["websocket", "connect"]
+    websocket:
+      url: "{{ws_url}}"
+      ping_interval: 30
+      heartbeat: true
+      timeout: 30
+      messages:
+        - type: send
+          content: '{"action": "ping"}'
+          wait_ms: 1000
+          assertions:
+            - type: status
+              expected: "open"
+        - type: receive
+          content: ""
+          wait_ms: 2000
+          assertions:
+            - type: body
+              property: "$.action"
+              expected: "ping"
+        - type: send
+          content: "Hello WebSocket!"
+          wait_ms: 1000
+        - type: receive
+          content: ""
+          wait_ms: 2000
+          assertions:
+            - type: body
+              expected: "Hello WebSocket!"
+              operator: contains
+        - type: ping
+          content: ""
+          wait_ms: 1000
+          assertions:
+            - type: status
+              expected: "pong"
+        - type: close
+          content: ""
+          wait_ms: 500
+
+  - id: "WS-002"
+    name: "WebSocket Extract 测试"
+    description: "测试从 WebSocket 消息中提取变量"
+    tags: ["websocket", "extract"]
+    websocket:
+      url: "{{ws_url}}"
+      timeout: 30
+      messages:
+        - type: send
+          content: '{"user_id": 123, "token": "abc123"}'
+          wait_ms: 1000
+        - type: receive
+          content: ""
+          wait_ms: 2000
+          extract:
+            ws_user_id: "$.user_id"
+            ws_token: "$.token"
+          assertions:
+            - type: body
+              property: "$.user_id"
+              expected: 123
+
+  - id: "SSE-001"
+    name: "SSE 连接测试"
+    description: "测试 SSE 连接和事件接收"
+    tags: ["sse"]
+    skip: true
+    sse:
+      url: "{{sse_url}}"
+      timeout: 30
+      events:
+        - event_name: "message"
+          wait_for: "data:"
+          count: 3
+          assertions:
+            - type: body
+              expected: "data:"
+              operator: contains
+        - event_name: "update"
+          wait_for: '"type":"update"'
+          count: 1
+          extract:
+            sse_update_id: "$.id"
+          assertions:
+            - type: body
+              property: "$.type"
+              expected: "update"
