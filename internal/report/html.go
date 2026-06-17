@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"os"
 	"regexp"
 	"time"
 
@@ -13,23 +14,21 @@ import (
 )
 
 type HTMLReporter struct {
-	HistoryRecords []models.HistoryRecord
+	HistoryRecords []*models.HistoryRecord
 }
 
 func NewHTMLReporter() *HTMLReporter {
 	return &HTMLReporter{}
 }
 
-func (r *HTMLReporter) Generate(suite models.SuiteResult, history []models.HistoryRecord) (string, error) {
-	r.HistoryRecords = history
-
+func (r *HTMLReporter) Generate(suite *models.SuiteResult, outputPath string) error {
 	data := struct {
-		Suite     models.SuiteResult
-		History   []models.HistoryRecord
+		Suite     *models.SuiteResult
+		History   []*models.HistoryRecord
 		Generated string
 	}{
 		Suite:     suite,
-		History:   history,
+		History:   r.HistoryRecords,
 		Generated: utils.FormatTime(time.Now()),
 	}
 
@@ -43,15 +42,19 @@ func (r *HTMLReporter) Generate(suite models.SuiteResult, history []models.Histo
 	}).Parse(htmlTemplate)
 
 	if err != nil {
-		return "", fmt.Errorf("parse template: %w", err)
+		return fmt.Errorf("parse template: %w", err)
 	}
 
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("execute template: %w", err)
+		return fmt.Errorf("execute template: %w", err)
 	}
 
-	return buf.String(), nil
+	if err := os.WriteFile(outputPath, buf.Bytes(), 0644); err != nil {
+		return fmt.Errorf("write file: %w", err)
+	}
+
+	return nil
 }
 
 func formatDurationHTML(d time.Duration) string {

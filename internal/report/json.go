@@ -3,6 +3,7 @@ package report
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"apitester/internal/models"
@@ -17,28 +18,28 @@ func NewJSONReporter() *JSONReporter {
 type jsonReport struct {
 	Version   string              `json:"version"`
 	Generated string              `json:"generated"`
-	Suite     models.SuiteResult  `json:"suite"`
+	Suite     *models.SuiteResult `json:"suite"`
 	Summary   jsonReportSummary   `json:"summary"`
-	Metadata  map[string]string `json:"metadata,omitempty"`
+	Metadata  map[string]string   `json:"metadata,omitempty"`
 }
 
 type jsonReportSummary struct {
-	Total      int     `json:"total"`
-	Passed     int     `json:"passed"`
-	Failed     int     `json:"failed"`
-	Skipped    int     `json:"skipped"`
-	PassRate   float64 `json:"pass_rate"`
-	Duration   float64 `json:"duration_seconds"`
-	DurationStr string `json:"duration"`
-	StartTime  string  `json:"start_time"`
-	EndTime    string  `json:"end_time"`
+	Total       int     `json:"total"`
+	Passed      int     `json:"passed"`
+	Failed      int     `json:"failed"`
+	Skipped     int     `json:"skipped"`
+	PassRate    float64 `json:"pass_rate"`
+	Duration    float64 `json:"duration_seconds"`
+	DurationStr string  `json:"duration"`
+	StartTime   string  `json:"start_time"`
+	EndTime     string  `json:"end_time"`
 }
 
-func (r *JSONReporter) Generate(suite models.SuiteResult) (string, error) {
+func (r *JSONReporter) Generate(suite *models.SuiteResult, outputPath string) error {
 	report := jsonReport{
 		Version:   "1.0",
 		Generated: time.Now().Format(time.RFC3339),
-		Suite:   suite,
+		Suite:     suite,
 		Summary: jsonReportSummary{
 			Total:       suite.Total,
 			Passed:      suite.Passed,
@@ -57,8 +58,12 @@ func (r *JSONReporter) Generate(suite models.SuiteResult) (string, error) {
 
 	data, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
-		return "", fmt.Errorf("marshal json: %w", err)
+		return fmt.Errorf("marshal json: %w", err)
 	}
 
-	return string(data), nil
+	if err := os.WriteFile(outputPath, data, 0644); err != nil {
+		return fmt.Errorf("write file: %w", err)
+	}
+
+	return nil
 }

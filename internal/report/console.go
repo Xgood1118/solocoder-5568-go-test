@@ -207,6 +207,73 @@ func (r *ConsoleReporter) highlightDiff(expected, actual string) string {
 	return result.String()
 }
 
+func (r *ConsoleReporter) ReportSuiteResult(suite *models.SuiteResult) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.clearLine()
+
+	fmt.Println()
+	fmt.Println(colorCyan + "════════════════════════════════════════════════════════════" + colorReset)
+	fmt.Println(colorCyan + "  测试报告摘要" + colorReset)
+	fmt.Println(colorCyan + "════════════════════════════════════════════════════════════" + colorReset)
+	fmt.Println()
+	fmt.Printf("  测试套件: %s\n", suite.SuiteName)
+	fmt.Printf("  开始时间: %s\n", utils.FormatTime(suite.StartTime))
+	fmt.Printf("  结束时间: %s\n", utils.FormatTime(suite.EndTime))
+	fmt.Println()
+	fmt.Println("  " + colorCyan + "─────────────────────────────────────────────────────────" + colorReset)
+	fmt.Printf("  %-15s %s\n", "总用例数:", fmt.Sprintf("%d", suite.Total))
+	fmt.Printf("  %-15s %s\n", "通过:", colorGreen+fmt.Sprintf("%d", suite.Passed)+colorReset)
+	fmt.Printf("  %-15s %s\n", "失败:", colorRed+fmt.Sprintf("%d", suite.Failed)+colorReset)
+	fmt.Printf("  %-15s %s\n", "跳过:", colorYellow+fmt.Sprintf("%d", suite.Skipped)+colorReset)
+	fmt.Printf("  %-15s %.2f%%\n", "通过率:", suite.PassRate)
+	fmt.Printf("  %-15s %s\n", "总耗时:", utils.FormatDuration(suite.Duration))
+	fmt.Println("  " + colorCyan + "─────────────────────────────────────────────────────────" + colorReset)
+	fmt.Println()
+
+	for _, test := range suite.TestResults {
+		var status, statusColor string
+		switch test.Status {
+		case "passed":
+			status = "PASS"
+			statusColor = colorGreen
+		case "skipped":
+			status = "SKIP"
+			statusColor = colorYellow
+		default:
+			status = "FAIL"
+			statusColor = colorRed
+		}
+
+		line := fmt.Sprintf("%s[%s]%s %s (%.2fms)",
+			statusColor,
+			status,
+			colorReset,
+			test.CaseName,
+			float64(test.Duration.Microseconds())/1000.0,
+		)
+		fmt.Println(line)
+
+		if test.Status == "failed" {
+			for _, assert := range test.Assertions {
+				if !assert.Passed {
+					fmt.Printf("    %s✗%s %s\n", colorRed, colorReset, assert.Name)
+					fmt.Printf("       期望值: %v\n", assert.Expected)
+					fmt.Printf("       实际值: %v\n", assert.Actual)
+				}
+			}
+			if test.Error != "" {
+				fmt.Printf("    %s错误:%s %s\n", colorRed, colorReset, test.Error)
+			}
+		}
+	}
+
+	fmt.Println()
+	fmt.Println(colorCyan + "════════════════════════════════════════════════════════════" + colorReset)
+	r.lastLineLen = 0
+}
+
 func (r *ConsoleReporter) Start() {
 	go func() {
 		ticker := time.NewTicker(100 * time.Millisecond)

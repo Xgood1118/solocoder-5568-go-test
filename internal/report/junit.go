@@ -3,6 +3,7 @@ package report
 import (
 	"encoding/xml"
 	"fmt"
+	"os"
 
 	"apitester/internal/models"
 )
@@ -51,21 +52,21 @@ type junitSkipped struct {
 	Message string   `xml:"message,attr,omitempty"`
 }
 
-func (r *JUnitReporter) Generate(suite models.SuiteResult) (string, error) {
-	testcases := make([]junitTestcase, 0, len(suite.Tests))
+func (r *JUnitReporter) Generate(suite *models.SuiteResult, outputPath string) error {
+	testcases := make([]junitTestcase, 0, len(suite.TestResults))
 
-	for _, test := range suite.Tests {
+	for _, test := range suite.TestResults {
 		tc := junitTestcase{
-			Name:      test.Name,
-			Classname: suite.Name,
+			Name:      test.CaseName,
+			Classname: suite.SuiteName,
 			Time:      test.Duration.Seconds(),
 		}
 
-		if test.Skipped {
+		if test.Status == "skipped" {
 			tc.Skipped = &junitSkipped{
 				Message: test.SkipReason,
 			}
-		} else if !test.Passed {
+		} else if test.Status == "failed" {
 			failureMsg := r.buildFailureMessage(test)
 			tc.Failure = &junitFailure{
 				Message: failureMsg,
@@ -78,7 +79,7 @@ func (r *JUnitReporter) Generate(suite models.SuiteResult) (string, error) {
 	}
 
 	testsuite := junitTestsuite{
-		Name:      suite.Name,
+		Name:      suite.SuiteName,
 		Tests:     suite.Total,
 		Passed:    suite.Passed,
 		Failures:  suite.Failed,
@@ -94,13 +95,18 @@ func (r *JUnitReporter) Generate(suite models.SuiteResult) (string, error) {
 
 	data, err := xml.MarshalIndent(testsuites, "", "  ")
 	if err != nil {
-		return "", fmt.Errorf("marshal xml: %w", err)
+		return fmt.Errorf("marshal xml: %w", err)
 	}
 
-	return xml.Header + string(data), nil
+	content := xml.Header + string(data)
+	if err := os.WriteFile(outputPath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("write file: %w", err)
+	}
+
+	return nil
 }
 
-func (r *JUnitReporter) buildFailureMessage(test models.TestResult) string {
+func (r *JUnitReporter) buildFailureMessage(test *models.TestResult) string {
 	if test.Error != "" {
 		return test.Error
 	}
@@ -114,7 +120,7 @@ func (r *JUnitReporter) buildFailureMessage(test models.TestResult) string {
 	return "测试失败"
 }
 
-func (r *JUnitReporter) buildFailureContent(test models.TestResult) string {
+func (r *JUnitReporter) buildFailureContent(test *models.TestResult) string {
 	var content string
 
 	if test.Error != "" {
@@ -132,8 +138,8 @@ func (r *JUnitReporter) buildFailureContent(test models.TestResult) string {
 			if !assert.Passed {
 				content += fmt.Sprintf("   期望值: %v\n", assert.Expected)
 				content += fmt.Sprintf("   实际值: %v\n", assert.Actual)
-				if assert.Description != "" {
-					content += fmt.Sprintf("   描述: %s\n", assert.Description)
+				if assert.Message != "" {
+					content += fmt.Sprintf("   消息: %s\n", assert.Message)
 				}
 			}
 		}

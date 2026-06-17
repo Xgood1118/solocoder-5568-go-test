@@ -7,37 +7,45 @@ import (
 	"apitester/internal/auth"
 	"apitester/internal/filter"
 	"apitester/internal/models"
+	"apitester/internal/parser"
 	"apitester/internal/variables"
 )
 
 type TestEngine struct {
 	options       *models.ExecutionOptions
 	variableStore *variables.VariableStore
-	authManager *auth.AuthManager
-	filterEngine *filter.FilterEngine
+	authManager   *auth.AuthManager
+	filterEngine  *filter.FilterEngine
+	parser        *parser.Parser
 }
 
-func NewTestEngine(options *models.ExecutionOptions) *TestEngine {
-	if options == nil {
-		options = &models.ExecutionOptions{}
-	}
-
+func NewTestEngine(options models.ExecutionOptions) *TestEngine {
 	variableStore := variables.NewVariableStore()
 	variableStore.SetBuiltinVariables()
 
 	if options.Environment != "" {
-		variableStore.Set(variables.ScopeEnvironment, "env", options.Environment)
+		variableStore.Set(models.ScopeEnvironment, "env", options.Environment)
 	}
 
 	return &TestEngine{
-		options:       options,
+		options:       &options,
 		variableStore: variableStore,
 		authManager:   auth.NewAuthManager(),
 		filterEngine:  filter.NewFilterEngine(),
+		parser:        parser.NewParser(),
 	}
 }
 
-func (te *TestEngine) RunSuite(suite *models.TestSuite) *models.SuiteResult {
+func (te *TestEngine) RunSuite(filePath string) (*models.SuiteResult, error) {
+	suite, err := te.parser.LoadSuite(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("parse suite file: %w", err)
+	}
+
+	return te.runSuiteInternal(suite), nil
+}
+
+func (te *TestEngine) runSuiteInternal(suite *models.TestSuite) *models.SuiteResult {
 	startTime := time.Now()
 
 	suiteResult := &models.SuiteResult{

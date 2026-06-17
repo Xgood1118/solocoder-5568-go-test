@@ -144,7 +144,7 @@ func (sr *SuiteRunner) worker(jobs <-chan *models.TestCase, results chan<- *mode
 
 	for tc := range jobs {
 		result := sr.executor.ExecuteCase(tc, sr.baseURL, sr.authConfig)
-		results <- &result
+		results <- result
 	}
 }
 

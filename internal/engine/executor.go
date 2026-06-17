@@ -40,12 +40,12 @@ func NewCaseExecutor(
 
 	return &CaseExecutor{
 		variableStore:   variableStore,
-		interpolator:  variables.NewInterpolator(variableStore),
-		authManager:    authManager,
+		interpolator:    variables.NewInterpolator(variableStore),
+		authManager:     authManager,
 		assertionEngine: assert.NewAssertionEngine(),
-		httpClient:     *httpclient.NewClient(clientOpt),
-		defaultTimeout: defaultTimeout,
-		defaultRetries: defaultRetries,
+		httpClient:      httpclient.NewClient(clientOpt),
+		defaultTimeout:  defaultTimeout,
+		defaultRetries:  defaultRetries,
 	}
 }
 
@@ -53,10 +53,10 @@ func (ce *CaseExecutor) ExecuteCase(tc *models.TestCase, baseURL string, suiteAu
 	startTime := time.Now()
 
 	result := &models.TestResult{
-		CaseID:   tc.ID,
-		CaseName: tc.Name,
+		CaseID:    tc.ID,
+		CaseName:  tc.Name,
 		StartTime: startTime,
-		Status:   "running",
+		Status:    "running",
 	}
 
 	if tc.ID == "" {
@@ -142,7 +142,7 @@ func (ce *CaseExecutor) ExecuteCase(tc *models.TestCase, baseURL string, suiteAu
 		}
 	}
 
-	return *result
+	return result
 }
 
 func (ce *CaseExecutor) executeWithTimeout(
@@ -198,7 +198,7 @@ func (ce *CaseExecutor) executeSingle(
 
 	req, err := ce.buildRequest(tc, baseURL, authConfig)
 	if err != nil {
-		return &ExecuteResult{Result: result}, err}
+		return &ExecuteResult{Result: result}, err
 	}
 	result.Request = req
 
@@ -257,19 +257,35 @@ func (ce *CaseExecutor) buildRequest(
 	req.URL = interpolatedURL
 
 	if req.Headers != nil {
-		interpolatedHeaders, err := ce.interpolator.InterpolateMap(req.Headers)
+		headersAny := make(map[string]any)
+		for k, v := range req.Headers {
+			headersAny[k] = v
+		}
+		interpolatedHeaders, err := ce.interpolator.InterpolateMap(headersAny)
 		if err != nil {
 			return nil, fmt.Errorf("interpolate headers: %w", err)
 		}
-		req.Headers = interpolatedHeaders
+		for k, v := range interpolatedHeaders {
+			if str, ok := v.(string); ok {
+				req.Headers[k] = str
+			}
+		}
 	}
 
 	if req.QueryParams != nil {
-		interpolatedQuery, err := ce.interpolator.InterpolateMap(req.QueryParams)
+		queryAny := make(map[string]any)
+		for k, v := range req.QueryParams {
+			queryAny[k] = v
+		}
+		interpolatedQuery, err := ce.interpolator.InterpolateMap(queryAny)
 		if err != nil {
 			return nil, fmt.Errorf("interpolate query params: %w", err)
 		}
-		req.QueryParams = interpolatedQuery
+		for k, v := range interpolatedQuery {
+			if str, ok := v.(string); ok {
+				req.QueryParams[k] = str
+			}
+		}
 	}
 
 	if req.Body != nil && req.Body.JSON != nil {
@@ -281,11 +297,19 @@ func (ce *CaseExecutor) buildRequest(
 	}
 
 	if req.Body != nil && req.Body.Form != nil {
-		interpolatedForm, err := ce.interpolator.InterpolateMap(req.Body.Form)
+		formAny := make(map[string]any)
+		for k, v := range req.Body.Form {
+			formAny[k] = v
+		}
+		interpolatedForm, err := ce.interpolator.InterpolateMap(formAny)
 		if err != nil {
 			return nil, fmt.Errorf("interpolate form: %w", err)
 		}
-		req.Body.Form = interpolatedForm
+		for k, v := range interpolatedForm {
+			if str, ok := v.(string); ok {
+				req.Body.Form[k] = str
+			}
+		}
 	}
 
 	return req, nil
@@ -300,7 +324,7 @@ func (ce *CaseExecutor) ExecuteSetupTeardown(cases []*models.TestCase, baseURL s
 
 	for _, tc := range cases {
 		result := ce.ExecuteCase(tc, baseURL, authConfig)
-		results = append(results, &result)
+		results = append(results, result)
 	}
 
 	return results
